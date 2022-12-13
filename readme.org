@@ -1,0 +1,235 @@
+#+title: Mimacs - Una configuración básica de Emacs que funciona (para mí)
+#+author: Juan E. Gómez-Morantes, PhD
+
+* Introducción
+=mimacs= es una configuración básica para =emacs= que funciona (para mí). La idea detrás del proyecto es tener una configuración básica que:
+
++ Funcione de forma uniforme en los diferentes dispositivos en los que uso =emacs= (PCs =linux=, PCs =windows= con =wsl2=, y dispositivos =android= usando =termux=)
++ Sea modular para escoger qué módulos cargar en los diferentes dispositivos
++ Sea evolutiva, bien documentada, y fácil de mantener
+
+Finalmente, espero que sea útil (como configuración base o como inspiración para construir configuraciones personalizadas) a personas que tengan casos de uso de =emacs= similares a los mios. Para lo que más uso =emacs= es:
++ Edición de documentos con =org-mode= y exportación a =pdf= con =LaTex=. Sobretodo documentos académicos, así que hago uso extensivo de gestión de referencias académicas
++ Gestión de conocimiento personal con =org-roam=
++ Correo electrónico con =mu4e=
++ Cliente =git= con =magit=
++ =vertico= > =ivy= > =helm=
++ Construcción de sitios web estáticos con =org-mode= y =org-publish=
+
+* Principios de diseño
+Esta configuración está influenciada en gran medida por proyectos como [[https://github.com/doomemacs/doomemacs][Doom Emacs]] y [[https://github.com/SystemCrafters/crafted-emacs][Crafted emacs]][fn:1]. En adición, incluye todas las preferencias que he ido construyendo luego de más de una década usando =emacs=. Algunos principios de diseño son:
+
++ Se desarrolla y documenta en español
++ Gestión de paquetes con =straight=. No se usa =use-package=
++ =evil-mode= como estilo de vida
++ Tema oscuro por defecto (larga vida a =modus-themes=)
++ Terminal como ciudadano de primera clase. =mimacs= debe funcionar bien en terminales
++ /Fuck Windows, all my homies use +Linux+ at least wsl2/
+
+* Arquitectura
+=Mimacs= está separado en módulos que contienen la configuración relevante para un paquete de emacs o para una preocupación transversal. Por ejemplo, se tiene el módulo [[*mimacs-org-mode][mimacs-org-mode]] con toda la configuración relativa a =org-mode=, pero también se tiene [[*mimacs-seleccion][mimacs-seleccion]] con la configuración relativa a ecosistema de selección de opciones en =emacs= (este módulo contiene configuración para los paquetes =vertico=, =marginalia=, =consult=, entre otras). Con esto se logra que el usuario de la configura pueda, muy fácilmente, escoger qué partes de =mimacs= son relevantes para su caso de uso, flujo de trabajo, o dispositivo. Finalmente, se enfatiza que esto no es una configuración completa; es una configuración básica que se puede (!y se debe!) extender.
+
+* Cómo usar
+Instalar =emacs= >= 28.2 (probablemente funcione con versiones anteriores de =emacs=, pero no ha sido probado). Luego, clonar este repositorio en =~/.config/emacs= o =~/.emacs.d= con:
+
+#+begin_src sh
+  git clone https://github.com/baracunatana/mimacs ~/.config/emacs
+#+end_src
+
+Con este se cargará al configuración básica, pero, por defecto, no se cargará ningún módulo. Estos se deben cargar según las preferencias del usuario. Para más información de esto, ver [[*Personalización][Personalización]].
+
+* =init.el=
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle ./init.el
+:END:
+Este archivo =init.el= es el orquestador de =mimacs=. En lo posible, no debería modificarse; toda personalización debe hacerse aparte (ver [[*Personalización][Personalización]]).
+
+Lo primero que se hace es crear un /hook/ para mostrar el tiempo que tomó la carga de =mimacs= (más sus personalizaciones).
+#+begin_src emacs-lisp 
+  (add-hook 'emacs-startup-hook
+            (lambda ()
+              (message "mimacs se cargó en %s."
+                       (emacs-init-time))))
+#+end_src
+
+Lo siguiente es desactivar los mensajes de alerta de /native comp/ si es que está disponible.
+#+begin_src emacs-lisp
+  (when (featurep 'native-compile)
+    (setq native-comp-async-report-warnings-errors nil))
+#+end_src
+
+En este punto debemos configurar =straight= para que pueda ser usado al momento de cargar los módulos.
+#+begin_src emacs-lisp
+  (setq package-enable-at-startup nil)
+
+  (defvar bootstrap-version)
+  (let ((bootstrap-file
+         (expand-file-name "straight/repos/straight.el/bootstrap.el" user-emacs-directory))
+        (bootstrap-version 5))
+    (unless (file-exists-p bootstrap-file)
+      (with-current-buffer
+          (url-retrieve-synchronously "https://raw.githubusercontent.com/raxod502/straight.el/develop/install.el"
+                                      'silent 'inhibit-cookies)
+        (goto-char (point-max))
+        (eval-print-last-sexp)))
+    (load bootstrap-file nil 'nomessage))
+#+end_src
+
+Para cargar los módulos (cargar, no activar) se debe registrar el directorio =./modulos= en el =load-path= de =emacs=.
+#+begin_src emacs-lisp
+  (add-to-list 'load-path (expand-file-name "modulos/" user-emacs-directory))
+#+end_src
+
+Para la personalización (ver [[*Personalización][Personalización]]) se debe definir la ruta a un archivo de configuración que, por defecto, se va a buscar en =~/.config/mimacs/config.el=
+#+begin_src emacs-lisp
+  (defvar mimacs-archivo-configuracion-usuario "~/.config/mimacs/config.el" "Archivo de configuración del usuario .")
+#+end_src
+
+Finalmente, se carga la configuración personal del usuario.
+#+begin_src emacs-lisp
+  (when (file-exists-p crafted-config-file)
+    (load mimacs-archivo-configuracion-usuario nil 'nomessage))
+#+end_src
+
+* Módulos
+** mimacs-interfaz
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle ./modulos/mimacs-interfaz.el
+:END:
+Este módulo se encarga de:
++ Configuración básica de interfaz gráfica de usuario
++ Configuración de tema gráfico
+
+Esto lo hace usando =all-the-icons=, =modus-themes=, =undo-tree=, y =doom-modeline=.
+
+Lo primero que hacemos es deshabilitar opciones de interfaz gráfica que no son necesarias (ni estéticas) como la barra de herramientas o de menús. 
+#+begin_src emacs-lisp 
+  (when (display-graphic-p)
+    (set-fringe-mode 10)      ; Dar algo de espacio entre ventanas
+    (scroll-bar-mode -1))     ; Desabilitar el scroll bar
+  (tool-bar-mode -1)          ; Desabilitar la barra de herramientas
+  (tooltip-mode -1)           ; Desabilitar tool tips
+  (menu-bar-mode -1)          ; Desabilitar barra de menú
+#+end_src
+
+Luego de esto se hacen algunas configuraciones globales para mejorar la usabilidad de =emacs=.
+#+begin_src emacs-lisp 
+  (global-visual-line-mode)   ; Word wrapping por defecto en todos los modos
+  (global-auto-revert-mode t) ; Activar global auto-revert 
+#+end_src
+
+El tema por defecto de =mimacs= es =modus-vivendi=, así que se instala y se carga de inicio.
+#+begin_src emacs-lisp 
+  (straight-use-package 'modus-themes)
+  (modus-themes-load-themes)
+  (modus-themes-load-vivendi)
+#+end_src
+
+Para mejorar la experiencia de /undo/, se instala =undo-tree=
+#+begin_src emacs-lisp 
+  (straight-use-package 'undo-tree)
+  (global-undo-tree-mode)
+#+end_src
+
+Se instala =all-the-icons= para tener soporte de fuentes con iconos.
+#+begin_src emacs-lisp 
+  (straight-use-package 'all-the-icons)
+#+end_src
+
+En cuento al /modeline/, se usa =doom-modeline=. Esto debe cargarse al final de la inicialización de =emacs=, así que se carga activa con un /hook/.
+#+begin_src emacs-lisp 
+  (straight-use-package 'doom-modeline)
+  (add-hook 'after-init-hook 'doom-modeline-mode)
+#+end_src
+
+Finalmente, se define el /provide/ del módulo
+#+begin_src emacs-lisp 
+  (provide 'mimacs-interfaz)
+#+end_src
+** mimacs-evil
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle ./modulos/mimacs-evil.el
+:END:
+=evil= permite edición modal y uso de acordes estilo vim en Emacs. Esta sección se limita a instalación y configuración básica de =evil= y los acordes globales. Los acordes locales deben ser definido en sus respectivos módulos.
+
+La razón de aislar la configuración de =evil= en un módulo independiente es permitir a los usuarios desadaptados y a los asesinos seriales (nadie más lo haría) continuar con los acordes de =emacs=. Siendo así, ningún módulo puede suponer que =evil= está cargado y tendrá que verificarlo antes de definir acordes.
+
+Lo primero que se hace es instala =evil=.
+#+begin_src emacs-lisp 
+  (straight-use-package 'evil)
+  (require 'evil)
+#+end_src
+
+Luego se hacen algunas configuraciones básicas para hacerlo más predecible y facilitar su uso de forma global.
+#+begin_src emacs-lisp 
+  (customize-set-variable evil-default-state 'normal)      ; iniciar en modo normal
+  (setq evil-want-C-i-jump nil)                            ; Para evitar conflictos con TAB en org-mode
+  (add-to-list 'evil-normal-state-modes 'compilation-mode) ; Iniciar compilation mode en estado normal
+  (with-eval-after-load 'undo-tree                         ; Empatar undo-tree con evil
+    (customize-set-variable 'evil-undo-system 'undo-tree)
+    (customize-set-variable 'evil-undo-system 'undo-redo))
+#+end_src
+
+Ahora sí se puede activar =evil-mode=.
+#+begin_src emacs-lisp 
+  (evil-mode)
+#+end_src
+
+Finalmente, se define el /provide/ del módulo
+#+begin_src emacs-lisp
+  (provide 'mimacs-evil)
+#+end_src
+
+** mimacs-seleccion
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle ./modulos/mimacs-seleccion.el
+:END:
+Este módulo se encarga de:
++ Configuración básica de ecosistema de selección usando =vertico=, =consult=, =marginalia=, =savehist=, =orderless=, y =embark=
+
+[[https://github.com/minad/vertico][=Vertico=]] es un paquete similar a =ivy= que permite la selección de opciones de forma amigable, estética, y sin tomar mucho espacio de pantalla como sí lo hace =helm=. Si bien es casi que equivalente en cuanto a funcionalidad a =ivy=, es preferible por se más ligero y aprovechar de mejor forma las funcionalidades nativas de emacs en lugar de crear funcionalidades adicionales como sí lo hace el ecosistema =ivy=. 
+
+Al tener una mejor utilización de funcionalidades de emacs, la configuración de =vertico= es mucho más simple:
+
+#+begin_src emacs-lisp 
+  (straight-use-package 'vertico)
+  (require 'vertico)
+
+  (with-eval-after-load 'evil           ; Acordes en modo selección de vertico
+    (define-key vertico-map (kbd "C-j") 'vertico-next)
+    (define-key vertico-map (kbd "C-k") 'vertico-previous)
+    (define-key vertico-map (kbd "M-h") 'vertico-directory-up))
+  (vertico-mode)
+#+end_src
+
+La siguiente configuración hace que =embark= muestre un menu de ayuda con cualquier prefijo de acorde. Es como un =which-key= bajo demanda que se activa con =C-h=. Por ejemplo, estando en =org-mode=, si se hace =C-c= no pasa nada (teniendo =which-key= desactivado), pero si se agrega =C-h= se muestra un menú completo de las funciones disponibles luego de ese prefijo. También funciona con acordes de =evil=.
+#+begin_src emacs-lisp 
+;;(setq prefix-help-command #'embark-prefix-help-command)
+#+end_src
+
+Finalmente, se define el /provide/ del módulo
+#+begin_src emacs-lisp 
+  (provide 'mimacs-seleccion)
+#+end_src
+
+** mimacs-correo-mu4e
+Este módulo se encarga de:
++ Todo lo relacionado con la configuración de correo electrónico centrado en mu4e
+** mimacs-org-mode
+Este módulo se encarga de:
++ Configuración básica de =org-mode=
+** mimacs-plantillas-yasnippet
+Este módulo se encarga de:
++ Configuración básica de =yasnippet= como gestor de plantillas
+** mimacs-projectile
+Este módulo se encarga de:
++ Configuración básica de =projectile= como gestor de proyectos
+** mimacs-magit
+Este módulo se encarga de:
++ Configuración básica de =magit= como cliente =git=
+
+* Personalización
+
+* Footnotes
+
+[fn:1] Ver también https://www.youtube.com/watch?v=uB8McDsRyXY 
