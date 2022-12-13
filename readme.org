@@ -175,6 +175,55 @@ Ahora sí se puede activar =evil-mode=.
   (evil-mode)
 #+end_src
 
+A continuación se configuran las teclas líderes globales (=SPC=) y locales (=SPC m=), y acordes globales de movimiento, manipulación de ventanas, /frames/, y otras cosas. 
+
+#+begin_src emacs-lisp 
+  (evil-set-leader 'normal (kbd "SPC"))
+  (evil-set-leader nil (kbd "M-SPC"))
+  (evil-set-leader 'normal (kbd "SPC m") t)
+  (evil-set-leader nil (kbd "M-SPC m") t)
+#+end_src
+
+Acordes de gestión de /buffers/ y archivos:
+#+begin_src emacs-lisp 
+(evil-define-key 'normal 'global (kbd "<leader>ag") 'save-buffer)
+(evil-define-key 'normal 'global (kbd "<leader>aa") 'find-file)
+(evil-define-key 'normal 'global (kbd "<leader>ag") 'save-buffer)
+(evil-define-key 'normal 'global (kbd "<leader>aE") 'mimacs-aliminar-archivo-y-buffer)
+#+end_src
+
+Acordes de gestión de ventanas:
+#+begin_src emacs-lisp 
+ (evil-define-key 'nil 'global (kbd "<leader>ve" 'evil-window-delete)
+ (evil-define-key 'nil 'global (kbd "<leader>vd" 'evil-window-split)
+ ;;(evil-define-key 'nil 'global (kbd "<leader>v<" 'evil-window-decrease-width)
+ ;;(evil-define-key 'nil 'global (kbd "<leader>v>" 'evil-window-increase-width)
+ (evil-define-key 'nil 'global (kbd "<leader>vj" 'evil-window-down)
+ (evil-define-key 'nil 'global (kbd "<leader>vq" 'evil-quit-all)
+ (evil-define-key 'nil 'global (kbd "<leader>vk" 'evil-window-up)
+ (evil-define-key 'nil 'global (kbd "<leader>vh" 'evil-window-left)
+ (evil-define-key 'nil 'global (kbd "<leader>vl" 'evil-window-right)
+ (evil-define-key 'nil 'global (kbd "<leader>vo" 'delete-other-windows)
+ ;;(evil-define-key 'nil 'global (kbd "<leader>vTAB"'(evil-window-next)
+ (evil-define-key 'nil 'global (kbd "<leader>vv" 'evil-window-vsplit)
+#+end_src
+
+Los anteriores acordes hacen uso de estas funciones:
+#+begin_src emacs-lisp 
+  (defun mimacs-aliminar-archivo-y-buffer ()
+    "Eliminar el archivo actual del disco duro y cierra su buffer"
+    (interactive)
+    (let ((filename (buffer-file-name)))
+      (if filename
+          (if (y-or-n-p (concat "¿De verdad quiere eliminar " filename " ?"))
+              (progn
+                (delete-file filename)
+                (message "%s eliminado." filename)
+                (kill-buffer)))
+        (message "Este buffer no representaba un archivo"))))
+
+#+end_src
+
 Finalmente, se define el /provide/ del módulo
 #+begin_src emacs-lisp
   (provide 'mimacs-evil)
