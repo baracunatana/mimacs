@@ -1,7 +1,8 @@
-(scroll-bar-mode -1)        ; Desabilitar el scroll bar
+(when (display-graphic-p)
+  (set-fringe-mode 10)      ; Dar algo de espacio entre ventanas
+  (scroll-bar-mode -1))     ; Desabilitar el scroll bar
 (tool-bar-mode -1)          ; Desabilitar la barra de herramientas
 (tooltip-mode -1)           ; Desabilitar tool tips
-(set-fringe-mode 10)        ; Dar algo de espacio entre ventanas
 (menu-bar-mode -1)          ; Desabilitar barra de menú
 
 (global-visual-line-mode)   ; Word wrapping por defecto en todos los modos
@@ -17,6 +18,6 @@
 (straight-use-package 'all-the-icons)
 
 (straight-use-package 'doom-modeline)
-(add-hook 'after-init-hook 'doom-modeline-init)
+(add-hook 'after-init-hook 'doom-modeline-mode)
 
 (provide 'mimacs-interfaz)
