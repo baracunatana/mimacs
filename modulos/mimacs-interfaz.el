@@ -8,16 +8,21 @@
 (global-visual-line-mode)   ; Word wrapping por defecto en todos los modos
 (global-auto-revert-mode t) ; Activar global auto-revert
 
-(straight-use-package 'modus-themes)
-(modus-themes-load-themes)
-(modus-themes-load-vivendi)
+(use-package modus-themes
+  :config
+  (modus-themes-load-themes)
+  (modus-themes-load-vivendi))
 
-(straight-use-package 'undo-tree)
-(global-undo-tree-mode)
+(use-package undo-tree
+  :config
+  (global-undo-tree-mode))
 
-(straight-use-package 'all-the-icons)
+(use-package all-the-icons)
 
-(straight-use-package 'doom-modeline)
-(add-hook 'after-init-hook 'doom-modeline-mode)
+(use-package doom-modeline
+  :after
+  all-the-icons
+  :hook
+  (after-init . doom-modeline-mode))
 
 (provide 'mimacs-interfaz)

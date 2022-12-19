@@ -13,18 +13,18 @@ Finalmente, espero que sea útil (como configuración base o como inspiración p
 + Gestión de conocimiento personal con =org-roam=
 + Correo electrónico con =mu4e=
 + Cliente =git= con =magit=
-+ =vertico= > =ivy= > =helm=
 + Construcción de sitios web estáticos con =org-mode= y =org-publish=
 
 * Principios de diseño
 Esta configuración está influenciada en gran medida por proyectos como [[https://github.com/doomemacs/doomemacs][Doom Emacs]] y [[https://github.com/SystemCrafters/crafted-emacs][Crafted emacs]][fn:1]. En adición, incluye todas las preferencias que he ido construyendo luego de más de una década usando =emacs=. Algunos principios de diseño son:
 
 + Se desarrolla y documenta en español
-+ Gestión de paquetes con =straight=. No se usa =use-package=
++ Gestión de paquetes con =straight= y =use-package=
 + =evil-mode= como estilo de vida
 + Tema oscuro por defecto (larga vida a =modus-themes=)
 + Terminal como ciudadano de primera clase. =mimacs= debe funcionar bien en terminales
 + /Fuck Windows, all my homies use +Linux+ at least wsl2/
++ =vertico= > =ivy= > =helm=
 
 * Arquitectura
 =Mimacs= está separado en módulos que contienen la configuración relevante para un paquete de emacs o para una preocupación transversal. Por ejemplo, se tiene el módulo [[*mimacs-org-mode][mimacs-org-mode]] con toda la configuración relativa a =org-mode=, pero también se tiene [[*mimacs-seleccion][mimacs-seleccion]] con la configuración relativa a ecosistema de selección de opciones en =emacs= (este módulo contiene configuración para los paquetes =vertico=, =marginalia=, =consult=, entre otras). Con esto se logra que el usuario de la configura pueda, muy fácilmente, escoger qué partes de =mimacs= son relevantes para su caso de uso, flujo de trabajo, o dispositivo. Finalmente, se enfatiza que esto no es una configuración completa; es una configuración básica que se puede (!y se debe!) extender.
@@ -64,15 +64,21 @@ En este punto debemos configurar =straight= para que pueda ser usado al momento 
 
   (defvar bootstrap-version)
   (let ((bootstrap-file
-         (expand-file-name "straight/repos/straight.el/bootstrap.el" user-emacs-directory))
-        (bootstrap-version 5))
+	 (expand-file-name "straight/repos/straight.el/bootstrap.el" user-emacs-directory))
+	(bootstrap-version 5))
     (unless (file-exists-p bootstrap-file)
       (with-current-buffer
-          (url-retrieve-synchronously "https://raw.githubusercontent.com/raxod502/straight.el/develop/install.el"
-                                      'silent 'inhibit-cookies)
-        (goto-char (point-max))
-        (eval-print-last-sexp)))
+	  (url-retrieve-synchronously "https://raw.githubusercontent.com/raxod502/straight.el/develop/install.el"
+				      'silent 'inhibit-cookies)
+	(goto-char (point-max))
+	(eval-print-last-sexp)))
     (load bootstrap-file nil 'nomessage))
+#+end_src
+
+Ahora se instala =use-package= y se configura para que use =straight= por defecto.
+#+begin_src emacs-lisp
+  (straight-use-package 'use-package)
+  (setq straight-use-package-by-default t)
 #+end_src
 
 Para cargar los módulos (cargar, no activar) se debe registrar el directorio =./modulos= en el =load-path= de =emacs=.
@@ -87,7 +93,7 @@ Para la personalización (ver [[*Personalización][Personalización]]) se debe d
 
 Finalmente, se carga la configuración personal del usuario.
 #+begin_src emacs-lisp
-  (when (file-exists-p crafted-config-file)
+  (when (file-exists-p mimacs-archivo-configuracion-usuario)
     (load mimacs-archivo-configuracion-usuario nil 'nomessage))
 #+end_src
 
@@ -99,7 +105,7 @@ Finalmente, se carga la configuración personal del usuario.
 Este módulo se encarga de:
 + Configuración básica de interfaz gráfica de usuario
 + Configuración de tema gráfico
-
+  
 Esto lo hace usando =all-the-icons=, =modus-themes=, =undo-tree=, y =doom-modeline=.
 
 Lo primero que hacemos es deshabilitar opciones de interfaz gráfica que no son necesarias (ni estéticas) como la barra de herramientas o de menús. 
@@ -120,113 +126,243 @@ Luego de esto se hacen algunas configuraciones globales para mejorar la usabilid
 
 El tema por defecto de =mimacs= es =modus-vivendi=, así que se instala y se carga de inicio.
 #+begin_src emacs-lisp 
-  (straight-use-package 'modus-themes)
-  (modus-themes-load-themes)
-  (modus-themes-load-vivendi)
+  (use-package modus-themes
+    :config
+    (modus-themes-load-themes)
+    (modus-themes-load-vivendi))
 #+end_src
 
 Para mejorar la experiencia de /undo/, se instala =undo-tree=
 #+begin_src emacs-lisp 
-  (straight-use-package 'undo-tree)
-  (global-undo-tree-mode)
+  (use-package undo-tree
+    :config
+    (global-undo-tree-mode))
 #+end_src
 
 Se instala =all-the-icons= para tener soporte de fuentes con iconos.
 #+begin_src emacs-lisp 
-  (straight-use-package 'all-the-icons)
+  (use-package all-the-icons)
 #+end_src
 
-En cuento al /modeline/, se usa =doom-modeline=. Esto debe cargarse al final de la inicialización de =emacs=, así que se carga activa con un /hook/.
+En cuento al /modeline/, se usa =doom-modeline=. Esto debe cargarse al final de la inicialización de =emacs=, así que se carga con un /hook/.
 #+begin_src emacs-lisp 
-  (straight-use-package 'doom-modeline)
-  (add-hook 'after-init-hook 'doom-modeline-mode)
+  (use-package doom-modeline
+    :after
+    all-the-icons
+    :hook
+    (after-init . doom-modeline-mode))
 #+end_src
 
 Finalmente, se define el /provide/ del módulo
 #+begin_src emacs-lisp 
   (provide 'mimacs-interfaz)
 #+end_src
+
 ** mimacs-evil
 :PROPERTIES:
 :header-args:emacs-lisp: :tangle ./modulos/mimacs-evil.el
 :END:
-=evil= permite edición modal y uso de acordes estilo vim en Emacs. Esta sección se limita a instalación y configuración básica de =evil= y los acordes globales. Los acordes locales deben ser definido en sus respectivos módulos.
+=evil= permite edición modal y uso de acordes estilo vim en Emacs. Este módulo se limita a instalación y configuración básica de =evil=. Los acordes, globales y locales, se hacen en un [[*mimacs-acordes][módulo]]  independiente. Tambien se puede usar =evil-collection=.
 
-La razón de aislar la configuración de =evil= en un módulo independiente es permitir a los usuarios desadaptados y a los asesinos seriales (nadie más lo haría) continuar con los acordes de =emacs=. Siendo así, ningún módulo puede suponer que =evil= está cargado y tendrá que verificarlo antes de definir acordes.
-
-Lo primero que se hace es instala =evil=.
-#+begin_src emacs-lisp 
-  (straight-use-package 'evil)
-  (require 'evil)
-#+end_src
-
-Luego se hacen algunas configuraciones básicas para hacerlo más predecible y facilitar su uso de forma global.
-#+begin_src emacs-lisp 
-  (customize-set-variable evil-default-state 'normal)      ; iniciar en modo normal
-  (setq evil-want-C-i-jump nil)                            ; Para evitar conflictos con TAB en org-mode
-  (add-to-list 'evil-normal-state-modes 'compilation-mode) ; Iniciar compilation mode en estado normal
-  (with-eval-after-load 'undo-tree                         ; Empatar undo-tree con evil
-    (customize-set-variable 'evil-undo-system 'undo-tree)
-    (customize-set-variable 'evil-undo-system 'undo-redo))
-#+end_src
-
-Ahora sí se puede activar =evil-mode=.
-#+begin_src emacs-lisp 
-  (evil-mode)
-#+end_src
-
-A continuación se configuran las teclas líderes globales (=SPC=) y locales (=SPC m=), y acordes globales de movimiento, manipulación de ventanas, /frames/, y otras cosas. 
+La razón de aislar la configuración de =evil= en un módulo independiente es permitir a los usuarios desadaptados y a los sociópatas (nadie más lo haría) continuar con los acordes de =emacs=. Siendo así, ningún módulo puede suponer que =evil= está cargado y tendrá que verificarlo antes de definir acordes.
 
 #+begin_src emacs-lisp 
-  (evil-set-leader 'normal (kbd "SPC"))
-  (evil-set-leader nil (kbd "M-SPC"))
-  (evil-set-leader 'normal (kbd "SPC m") t)
-  (evil-set-leader nil (kbd "M-SPC m") t)
-#+end_src
-
-Acordes de gestión de /buffers/ y archivos:
-#+begin_src emacs-lisp 
-(evil-define-key 'normal 'global (kbd "<leader>ag") 'save-buffer)
-(evil-define-key 'normal 'global (kbd "<leader>aa") 'find-file)
-(evil-define-key 'normal 'global (kbd "<leader>ag") 'save-buffer)
-(evil-define-key 'normal 'global (kbd "<leader>aE") 'mimacs-aliminar-archivo-y-buffer)
-#+end_src
-
-Acordes de gestión de ventanas:
-#+begin_src emacs-lisp 
- (evil-define-key 'nil 'global (kbd "<leader>ve" 'evil-window-delete)
- (evil-define-key 'nil 'global (kbd "<leader>vd" 'evil-window-split)
- ;;(evil-define-key 'nil 'global (kbd "<leader>v<" 'evil-window-decrease-width)
- ;;(evil-define-key 'nil 'global (kbd "<leader>v>" 'evil-window-increase-width)
- (evil-define-key 'nil 'global (kbd "<leader>vj" 'evil-window-down)
- (evil-define-key 'nil 'global (kbd "<leader>vq" 'evil-quit-all)
- (evil-define-key 'nil 'global (kbd "<leader>vk" 'evil-window-up)
- (evil-define-key 'nil 'global (kbd "<leader>vh" 'evil-window-left)
- (evil-define-key 'nil 'global (kbd "<leader>vl" 'evil-window-right)
- (evil-define-key 'nil 'global (kbd "<leader>vo" 'delete-other-windows)
- ;;(evil-define-key 'nil 'global (kbd "<leader>vTAB"'(evil-window-next)
- (evil-define-key 'nil 'global (kbd "<leader>vv" 'evil-window-vsplit)
-#+end_src
-
-Los anteriores acordes hacen uso de estas funciones:
-#+begin_src emacs-lisp 
-  (defun mimacs-aliminar-archivo-y-buffer ()
-    "Eliminar el archivo actual del disco duro y cierra su buffer"
-    (interactive)
-    (let ((filename (buffer-file-name)))
-      (if filename
-          (if (y-or-n-p (concat "¿De verdad quiere eliminar " filename " ?"))
-              (progn
-                (delete-file filename)
-                (message "%s eliminado." filename)
-                (kill-buffer)))
-        (message "Este buffer no representaba un archivo"))))
-
+  (use-package evil
+    :custom
+    ;; Inicia en modo NORMAL por defecto en todos los modos
+    (evil-default-state 'normal)
+    ;; Para evitar conflictos con TAB en org-mode
+    (evil-want-C-i-jump nil)
+    :config
+    ;; Iniciar compilation mode en estado normal
+    (add-to-list 'evil-normal-state-modes 'compilation-mode) 
+    ;; Empatar undo-tree con evil
+    (with-eval-after-load 'undo-tree                         
+      (customize-set-variable 'evil-undo-system 'undo-tree)
+      (customize-set-variable 'evil-undo-system 'undo-redo))
+    ;; activa =evil-mode= de forma global
+    (evil-mode))
 #+end_src
 
 Finalmente, se define el /provide/ del módulo
 #+begin_src emacs-lisp
   (provide 'mimacs-evil)
+#+end_src
+
+** mimacs-acordes
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle ./modulos/mimacs-acordes.el
+:END:
+Este modulo se encarga de cargar acordes globales y locales para todos los módulos.
+
+A continuación se configuran las teclas líderes globales (=SPC=) y locales (=SPC m=) usando =general=. Si bien =evil= permite la configuracion de teclas lideres, se prefiere =general= ya que lo hace más fácil y de forma más predecible.
+
+#+begin_src emacs-lisp 
+  (use-package general
+    :after evil
+    :config
+    (general-create-definer mimacs-lider
+      :states '(normal visual insert emacs)
+      :keymaps 'override
+      :prefix "SPC"
+      :non-normal-prefix "M-SPC")
+
+    ;; definición de tecla lider local (relativo al major mode) para modo normal.
+    (general-create-definer mimacs-lider-local
+      :states '(normal visual insert emacs)
+      :prefix "SPC m"
+      :non-normal-prefix "M-SPC m"))
+#+end_src
+
+*** Acordes de gestión de /buffers/ y archivos:
+#+begin_src emacs-lisp 
+  (mimacs-lider
+    :infix "a"
+    "" '(:ignore t)
+    "a" 'find-file
+    "g" 'save-buffer
+    "E" 'mimacs-eliminar-archivo-y-buffer
+    "G" 'write-file)
+
+  (defun mimacs-eliminar-archivo-y-buffer ()
+    "Eliminar el archivo actual del disco duro y cierra su buffer"
+    (interactive)
+    (let ((filename (buffer-file-name)))
+      (if filename
+	  (if (y-or-n-p (concat "¿De verdad quiere eliminar " filename "?"))
+	      (progn
+		(delete-file filename)
+		(message "%s eliminado." filename)
+		(kill-buffer)))
+	(message "Este buffer no representaba un archivo"))))
+#+end_src
+
+*** Acordes de gestión de ventanas:
+#+begin_src emacs-lisp 
+  (mimacs-lider
+    :infix "v"
+    "" '(:ignore t)
+    "e" 'evil-window-delete
+    "d" 'evil-window-split
+    "<" 'evil-window-decrease-width
+    ">" 'evil-window-increase-width
+    "j" 'evil-window-down
+    "q" 'evil-quit-all
+    "k" 'evil-window-up
+    "h" 'evil-window-left
+    "l" 'evil-window-right
+    "o" 'delete-other-windows
+    "TAB" 'evil-window-next
+    "v" 'evil-window-vsplit)
+#+end_src
+
+*** Acordes de operaciones sobre /frames/
+#+begin_src emacs-lisp 
+  (mimacs-lider
+    :infix "f"
+    "" '(:ignore t)
+    "TAB" 'other-frame
+    "e" 'delete-frame
+    "c" 'make-frame)
+#+end_src
+
+*** Acordes para operaciones sobre /buffers/
+#+begin_src emacs-lisp 
+  (mimacs-lider
+    :infix "b"
+    "" '(:ignore t)
+    "e" 'kill-this-buffer
+    "k" 'previous-buffer
+    "-" 'text-scale-adjust
+    "+" 'text-scale-adjust
+    "r" 'revert-buffer
+    "v" 'visual-line-mode
+    "u" 'evil-switch-to-windows-last-buffer
+    "j" 'next-buffer)
+
+  (with-eval-after-load 'consult
+    (mimacs-lider
+      :infix "b"
+      "" '(:ignore t)
+      "b" 'consult-buffer))
+#+end_src
+
+*** Acordes generales para movimiento
+#+begin_src emacs-lisp 
+  (general-define-key
+    :states '(normal)
+    "j" 'evil-next-visual-line
+    "k" 'evil-previous-visual-line)
+
+  (general-define-key
+    :states '(normal)
+    :infix "g"
+    "h" 'evil-beginning-of-line
+    "G" 'end-of-buffer
+    "j" 'evil-next-line
+    "k" 'evil-previous-line
+    "l" 'evil-end-of-line)
+
+  (with-eval-after-load 'consult
+    (general-define-key
+     :states '(normal)
+     "gs"   'consult-line))
+#+end_src
+
+*** Acordes para seleccion de texto
+#+begin_src emacs-lisp 
+  (mimacs-lider
+    :states '(normal insert)
+    "SPC" 'set-mark-command)
+#+end_src
+
+*** Acordes para completar:
+#+begin_src emacs-lisp 
+(general-define-key
+  :states '(normal insert emacs)
+  "C-M-i" 'completion-at-point)
+#+end_src
+
+*** Acordes de =embark= (globales)
+#+begin_src emacs-lisp 
+  (with-eval-after-load 'embark
+    (general-define-key
+     :states '(normal insert emacs visual)
+     "M-o"  'embark-act
+     "M-S-o" 'embark-dwim
+     "C-h B" 'embark-bindings))
+#+end_src
+
+*** Acordes locales para =vertico=
+#+begin_src emacs-lisp 
+  (with-eval-after-load 'vertico
+    (define-key vertico-map (kbd "C-j") 'vertico-next)
+    (define-key vertico-map (kbd "C-k") 'vertico-previous)
+    (define-key vertico-map (kbd "M-H") 'vertico-directory-up))
+#+end_src
+
+*** Acordes para =kmacro=
+#+begin_src emacs-lisp 
+  (with-eval-after-load 'consult
+    (mimacs-lider
+      :infix "k"
+      "c" '(consult-kmacro :which-key "cargar macro")))
+
+  (mimacs-lider
+    :infix "k"
+    "" '(:ignore t)
+    "g" 'kmacro-start-macro
+    "d" 'kmacro-end-macro
+    "TAB" 'kmacro-insert-counter
+    "e" 'kmacro-set-counter
+    "s" 'kmacro-add-counter
+    "k" 'kmacro-call-macro)
+#+end_src
+
+*** Provide
+Finalmente, se define el /provide/ del módulo
+#+begin_src emacs-lisp 
+  (provide 'mimacs-acordes)
 #+end_src
 
 ** mimacs-seleccion
@@ -236,24 +372,80 @@ Finalmente, se define el /provide/ del módulo
 Este módulo se encarga de:
 + Configuración básica de ecosistema de selección usando =vertico=, =consult=, =marginalia=, =savehist=, =orderless=, y =embark=
 
-[[https://github.com/minad/vertico][=Vertico=]] es un paquete similar a =ivy= que permite la selección de opciones de forma amigable, estética, y sin tomar mucho espacio de pantalla como sí lo hace =helm=. Si bien es casi que equivalente en cuanto a funcionalidad a =ivy=, es preferible por se más ligero y aprovechar de mejor forma las funcionalidades nativas de emacs en lugar de crear funcionalidades adicionales como sí lo hace el ecosistema =ivy=. 
+[[https://github.com/minad/vertico][=vertico=]] es un paquete similar a =ivy= que permite la selección de opciones de forma amigable, estética, y sin tomar mucho espacio de pantalla como sí lo hace =helm=. Si bien es casi que equivalente en cuanto a funcionalidad a =ivy=, es preferible por se más ligero y aprovechar de mejor forma las funcionalidades nativas de emacs en lugar de crear funcionalidades adicionales como sí lo hace el ecosistema =ivy=. 
 
 Al tener una mejor utilización de funcionalidades de emacs, la configuración de =vertico= es mucho más simple:
 
 #+begin_src emacs-lisp 
-  (straight-use-package 'vertico)
-  (require 'vertico)
-
-  (with-eval-after-load 'evil           ; Acordes en modo selección de vertico
-    (define-key vertico-map (kbd "C-j") 'vertico-next)
-    (define-key vertico-map (kbd "C-k") 'vertico-previous)
-    (define-key vertico-map (kbd "M-h") 'vertico-directory-up))
-  (vertico-mode)
+  (use-package vertico
+    :config
+    ;; Activa la extension =vertico-directory=
+    (add-to-list 'load-path
+		 (expand-file-name "straight/build/vertico/extensions"
+				   straight-base-dir))
+    (require 'vertico-directory)
+    (vertico-mode))
 #+end_src
 
-La siguiente configuración hace que =embark= muestre un menu de ayuda con cualquier prefijo de acorde. Es como un =which-key= bajo demanda que se activa con =C-h=. Por ejemplo, estando en =org-mode=, si se hace =C-c= no pasa nada (teniendo =which-key= desactivado), pero si se agrega =C-h= se muestra un menú completo de las funciones disponibles luego de ese prefijo. También funciona con acordes de =evil=.
+=savehist= es un paquete incluido en emacs que permite guardar información de sesiones. Para el caso de =vertico=, permite guardar las opciones seleccionadas para que aparezcan en orden de seleccionado (de la más reciente a la más antigua).
+
 #+begin_src emacs-lisp 
-;;(setq prefix-help-command #'embark-prefix-help-command)
+  (use-package savehist
+    :after vertico
+    :config
+    (savehist-mode))
+#+end_src
+
+=marginalia= es un paquete equivalente a =ivy-rich= que mejora la estética de las listas de selección de =vertico= agregándoles información adicional.
+#+begin_src emacs-lisp 
+  (use-package marginalia
+    :after vertico
+    :config
+    (marginalia-mode))
+#+end_src
+
+Para tener íconos (de =all-the-icons=) en /buffers/ de selección, se debe usar el paquete =all-the-icons-completion=.
+#+begin_src emacs-lisp 
+  (use-package all-the-icons-completion
+    :after marginalia
+    :config
+    (all-the-icons-completion-mode))
+#+end_src
+
+=orderless= permite definir distintos métodos para filtrar opciones en sistemas de selección como =vertico=. La siguiente configuración permite un /fuzzy find/ para cualquier lista de candidatos de =vertico=.
+#+begin_src emacs-lisp 
+  (use-package orderless
+    :after vertico
+    :config
+    (setq completion-styles '(orderless basic)))
+#+end_src
+
+=consult= permite la creación de comandos específicos que permiten selección de opciones como resultado. Dentro de todas las funciones que ofrece, las que más uso son =consult-org-heading=, =consult-buffer=, y =consult-line=.
+
+#+begin_src emacs-lisp 
+  (use-package consult
+    :after vertico)
+#+end_src
+
+=embark= es una especie de clic derecho para emacs. Es similar a las opciones mostradas en =ivy= con =M-o=, pero se puede usar para cualquier elemento: URLs en texto, opciones de mini buffer, selección de texto, cadenas de caracteres, expresiones lisp, funciones, etc. Es supremamente poderoso y flexible.
+
+#+begin_src emacs-lisp 
+   ;; Este paquete se encarga de integrar =embark=y =consult= . Debe ser cargado antes de cargar =embark=
+   (use-package embark-consult
+     :after consult
+     :hook
+     (embark-collect-mode . consult-preview-at-point-mode))
+
+   (use-package embark
+     :config
+     ;; La siguiente configuración hace que =embark= muestre un menu de
+     ;; ayuda con cualquier prefijo de acorde. Es como un =which-key= bajo
+     ;; demanda que se activa con =C-h=. Por ejemplo, estando en =org-mode=,
+     ;; si se hace =C-c= no pasa nada (teniendo =which-key= desactivado),
+     ;; pero si se agrega =C-h= se muestra un menú completo de las funciones
+     ;; disponibles luego de ese prefijo. También funciona con acordes de
+     ;; =evil=
+     (setq prefix-help-command #'embark-prefix-help-command))
 #+end_src
 
 Finalmente, se define el /provide/ del módulo
@@ -261,12 +453,233 @@ Finalmente, se define el /provide/ del módulo
   (provide 'mimacs-seleccion)
 #+end_src
 
+** mimacs-org-mode
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle ./modulos/mimacs-org.el
+:END:
+Este módulo se encarga de configuración básica de =org-mode=. Otros paquetes que se basan en =org= pero que tengan casos de uso específicos (como =org-roam= o =org-ref=) se configuran en otros módulos. Se configura con =use-package= para que descargue la versión más reciente de =org= y no se quede con la que traiga la versión de =emacs= que estamos usando.
+
+Al ser un módulo complejo, se escribe usando =noweb=.
+
+#+begin_src emacs-lisp :noweb no-export
+  (use-package org
+    :custom
+    <<org-custom>>
+    :hook
+    <<org-hook>>
+    :config
+    <<org-config>>
+  
+  (provide 'mimacs-org)
+#+end_src
+
+*** Configuraciones visuales básicas
+#+begin_src emacs-lisp :noweb no-ref org-custom :tangle no
+  (org-startup-folded t)           ; Colapsar contenido al abrir un archivo
+  (org-startup-align-all-table t)  ; Empezar con las tablas colapsadas
+  (org-startup-indented t)         ; Activar org-indent-mode por defecto 
+  (org-tags-column 0)              ; Quitar espacio entre título y etiquetas
+  (org-list-allow-alphabetical t)  ; Permitir listas con letras
+  (org-table-header-line-p t)      ; Congelar primera fila de tablas largas
+  (org-confirm-babel-evaluate nil) ; No pedir confirmación para ejecutar código desde babel
+#+end_src
+
+*** Desactivar =electric-indent-mode= en =org=
+#+begin_src emacs-lisp :noweb no-ref org-hook :tangle no
+  (org-mode . (lambda () (electric-indent-local-mode -1)))
+#+end_src
+
+*** Seguir enlaces en la misma ventana
+#+begin_src emacs-lisp :noweb no-ref org-custom :tangle no
+  (setf (alist-get 'file org-link-frame-setup) #'find-file))
+#+end_src
+*** dwim
+La siguiente función dwim (do what I mean) se toma del [[https://github.com/hlissner/doom-emacs/blob/develop/modules/lang/org/autoload/org.el#L147][código de Doom]]. Se le modifica el nombre para conservar convención de nombramiento de funciones propias.
+
+#+begin_src emacs-lisp :tangle no :noweb-ref org-config
+  (defun mimacs-dwim-at-point (&optional arg)
+    "Do-what-I-mean at point.
+  If on a:
+  - checkbox list item or todo heading: toggle it.
+  - clock: update its time.
+  - headline: cycle ARCHIVE subtrees, toggle latex fragments and inline images in
+    subtree; update statistics cookies/checkboxes and ToCs.
+  - footnote reference: jump to the footnote's definition
+  - footnote definition: jump to the first reference of this footnote
+  - table-row or a TBLFM: recalculate the table's formulas
+  - table-cell: clear it and go into insert mode. If this is a formula cell,
+    recaluclate it instead.
+  - babel-call: execute the source block
+  - statistics-cookie: update it.
+  - latex fragment: toggle it.
+  - link: follow it
+  - otherwise, refresh all inline images in current tree."
+    (interactive "P")
+    (let* ((context (org-element-context))
+           (type (org-element-type context)))
+      ;; skip over unimportant contexts
+      (while (and context (memq type '(verbatim code bold italic underline strike-through subscript superscript)))
+        (setq context (org-element-property :parent context)
+              type (org-element-type context)))
+      (pcase type
+        (`headline
+         (cond ((memq (bound-and-true-p org-goto-map)
+                      (current-active-maps))
+                (org-goto-ret))
+               ((and (fboundp 'toc-org-insert-toc)
+                     (member "TOC" (org-get-tags)))
+                (toc-org-insert-toc)
+                (message "Updating table of contents"))
+               ((string= "ARCHIVE" (car-safe (org-get-tags)))
+                (org-force-cycle-archived))
+               ((or (org-element-property :todo-type context)
+                    (org-element-property :scheduled context))
+                (org-todo
+                 (if (eq (org-element-property :todo-type context) 'done)
+                     (or (car (+org-get-todo-keywords-for (org-element-property :todo-keyword context)))
+                         'todo)
+                   'done))))
+         ;; Update any metadata or inline previews in this subtree
+         (org-update-checkbox-count)
+         (org-update-parent-todo-statistics)
+         (when (and (fboundp 'toc-org-insert-toc)
+                    (member "TOC" (org-get-tags)))
+           (toc-org-insert-toc)
+           (message "Updating table of contents"))
+         (let* ((beg (if (org-before-first-heading-p)
+                         (line-beginning-position)
+                       (save-excursion (org-back-to-heading) (point))))
+                (end (if (org-before-first-heading-p)
+                         (line-end-position)
+                       (save-excursion (org-end-of-subtree) (point))))
+                (overlays (ignore-errors (overlays-in beg end)))
+                (latex-overlays
+                 (cl-find-if (lambda (o) (eq (overlay-get o 'org-overlay-type) 'org-latex-overlay))
+                             overlays))
+                (image-overlays
+                 (cl-find-if (lambda (o) (overlay-get o 'org-image-overlay))
+                             overlays)))
+           (+org--toggle-inline-images-in-subtree beg end)
+           (if (or image-overlays latex-overlays)
+               (org-clear-latex-preview beg end)
+             (org--latex-preview-region beg end))))
+
+        (`clock (org-clock-update-time-maybe))
+
+        (`footnote-reference
+         (org-footnote-goto-definition (org-element-property :label context)))
+
+        (`footnote-definition
+         (org-footnote-goto-previous-reference (org-element-property :label context)))
+
+        ((or `planning `timestamp)
+         (org-follow-timestamp-link))
+
+        ((or `table `table-row)
+         (if (org-at-TBLFM-p)
+             (org-table-calc-current-TBLFM)
+           (ignore-errors
+             (save-excursion
+               (goto-char (org-element-property :contents-begin context))
+               (org-call-with-arg 'org-table-recalculate (or arg t))))))
+
+        (`table-cell
+         (org-table-blank-field)
+         (org-table-recalculate arg)
+         (when (and (string-empty-p (string-trim (org-table-get-field)))
+                    (bound-and-true-p evil-local-mode))
+           (evil-change-state 'insert)))
+
+        (`babel-call
+         (org-babel-lob-execute-maybe))
+
+        (`statistics-cookie
+         (save-excursion (org-update-statistics-cookies arg)))
+
+        ((or `src-block `inline-src-block)
+         (org-babel-execute-src-block arg))
+
+        ((or `latex-fragment `latex-environment)
+         (org-latex-preview arg))
+
+        (`link
+         (let* ((lineage (org-element-lineage context '(link) t))
+                (path (org-element-property :path lineage)))
+           (if (or (equal (org-element-property :type lineage) "img")
+                   (and path (image-type-from-file-name path)))
+               (+org--toggle-inline-images-in-subtree
+                (org-element-property :begin lineage)
+                (org-element-property :end lineage))
+             (org-open-at-point arg))))
+
+        ((guard (org-element-property :checkbox (org-element-lineage context '(item) t)))
+         (let ((match (and (org-at-item-checkbox-p) (match-string 1))))
+           (org-toggle-checkbox (if (equal match "[ ]") '(16)))))
+
+        (_
+         (if (or (org-in-regexp org-ts-regexp-both nil t)
+                 (org-in-regexp org-tsr-regexp-both nil  t)
+                 (org-in-regexp org-link-any-re nil t))
+             (call-interactively #'org-open-at-point)
+           (+org--toggle-inline-images-in-subtree
+            (org-element-property :begin context)
+            (org-element-property :end context)))))))
+
+  (defun +org--toggle-inline-images-in-subtree (&optional beg end refresh)
+    "Refresh inline image previews in the current heading/tree."
+    (let ((beg (or beg
+                   (if (org-before-first-heading-p)
+                       (line-beginning-position)
+                     (save-excursion (org-back-to-heading) (point)))))
+          (end (or end
+                   (if (org-before-first-heading-p)
+                       (line-end-position)
+                     (save-excursion (org-end-of-subtree) (point)))))
+          (overlays (cl-remove-if-not (lambda (ov) (overlay-get ov 'org-image-overlay))
+                                      (ignore-errors (overlays-in beg end)))))
+      (dolist (ov overlays nil)
+        (delete-overlay ov)
+        (setq org-inline-image-overlays (delete ov org-inline-image-overlays)))
+      (when (or refresh (not overlays))
+        (org-display-inline-images t t beg end)
+        t)))
+
+  (defun +org-get-todo-keywords-for (&optional keyword)
+    "Returns the list of todo keywords that KEYWORD belongs to."
+    (when keyword
+      (cl-loop for (type . keyword-spec)
+               in (cl-remove-if-not #'listp org-todo-keywords)
+               for keywords =
+               (mapcar (lambda (x) (if (string-match "^\\([^(]+\\)(" x)
+                                       (match-string 1 x)
+                                     x))
+                       keyword-spec)
+               if (eq type 'sequence)
+               if (member keyword keywords)
+               return keywords)))
+#+end_src
+
+** mimacs-org-mode-theme
+Este módulo contiene configuraciones visuales y de tema gráfico para =org=
+
+#+begin_src emacs-lisp :noweb no-export
+  (setq org-todo-keyword-faces '(("PROY" . (:foreground "#d33682" :weight bold))
+                                 ("ESPE" . (:foreground "#b58900" :weight bold))
+                                 ("EMPE" . (:foreground "#ef4f60" :weight bold))
+                                 ("DONE" . (:foreground "#859900" :weight bold))
+                                 ("CANC" . (:foreground "#859900" :weight bold))
+                                 ("FUTU" . (:foreground "#2aa198" :weight bold))
+                                 ("TODO" . (:foreground "#ef0000" :weight bold))))
+
+  (use-package svg-tag-mode
+    :config
+    (setq svg-tag-tags
+          '(("TODO" . ((lambda (tag) (svg-tag-make "TODO" :face 'org-todo :inverse t))))
+            ("DONE" . ((lambda (tag) (svg-tag-make "DONE" :face 'org-done)))))))
+#+end_src
 ** mimacs-correo-mu4e
 Este módulo se encarga de:
 + Todo lo relacionado con la configuración de correo electrónico centrado en mu4e
-** mimacs-org-mode
-Este módulo se encarga de:
-+ Configuración básica de =org-mode=
 ** mimacs-plantillas-yasnippet
 Este módulo se encarga de:
 + Configuración básica de =yasnippet= como gestor de plantillas
